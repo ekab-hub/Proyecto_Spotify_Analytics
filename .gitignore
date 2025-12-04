@@ -1,3 +1,4 @@
 datos/crudos/
 datos/procesados/
 __pycache__/
+.DS_Store
