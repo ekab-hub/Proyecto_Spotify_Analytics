@@ -5,6 +5,8 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 
+from PIL import Image
+
 # Ruta raíz del proyecto (Proyecto_Spotify_Analytics)
 RUTA_RAIZ = Path(__file__).resolve().parents[2]
 if str(RUTA_RAIZ) not in sys.path:
@@ -22,6 +24,52 @@ from src.analitica_spotify.consultas import (
     top_canciones,
     artistas_emergentes_y_olvidados
 )
+
+def cargar_imagenes_artistas() -> pd.DataFrame:
+    """
+    Carga el catálogo de imágenes de artistas para el usuario dado.
+    Espera un CSV en datos/aux:
+      - imagenes_artistas_elias.csv
+      - imagenes_artistas_elie.csv
+    con columnas: artista, url_imagen
+    """
+    ruta_aux = RUTA_RAIZ / "datos" / "aux" / "imagenes_artistas.csv"
+
+    if not ruta_aux.exists():
+        return pd.DataFrame(columns=["usuario", "artista", "url_imagen"])
+
+    try:
+        df_img = pd.read_csv(ruta_aux)
+        cols_min = {"usuario", "artista", "url_imagen"}
+        if not cols_min.issubset(set(df_img.columns)):
+            return pd.DataFrame(columns=["usuario", "artista", "url_imagen"])
+        return df_img
+    except Exception:
+        return pd.DataFrame(columns=["usuario", "artista", "url_imagen"])
+
+def imagen_cuadrada(path, size=160):
+    """
+    Abre una imagen, la recorta al centro para que sea cuadrada
+    y la redimensiona al tamaño especificado.
+    """
+    try:
+        img = Image.open(path).convert("RGB")
+        w, h = img.size
+        
+        # Lado del cuadrado
+        side = min(w, h)
+        
+        # Coordenadas para recorte centrado
+        left = (w - side) // 2
+        top = (h - side) // 2
+        right = left + side
+        bottom = top + side
+
+        img = img.crop((left, top, right, bottom))
+        img = img.resize((size, size))
+        return img
+    except Exception as e:
+        return None
 
 
 def cargar_datos():
@@ -81,6 +129,39 @@ def obsesion_multi(df: pd.DataFrame, niveles=(1, 5, 10)) -> dict:
     """
     return {f"top_{n}": indice_obsesion(df, n=n) for n in niveles}
 
+def preparar_pastel_obsesion(df_user: pd.DataFrame) -> pd.DataFrame:
+     """
+    Construye un dataframe con segmentos para un pastel:
+    Top 1, Resto Top 5, Resto Top 10, Otros.
+    """
+     obs1 = indice_obsesion(df_user, n=1)
+     obs5 = indice_obsesion(df_user, n=5)
+     obs10 = indice_obsesion(df_user, n=10)
+     seg_top1 = obs1
+     seg_top5 = max(obs5 - obs1, 0)
+     seg_top10 = max(obs10 - obs5, 0)
+     seg_otros = max(100 - obs10, 0)
+     datos = {
+         "segmento": ["Top 1", "Resto Top 5", "Resto Top 10", "Otros"],
+         "porcentaje": [seg_top1, seg_top5, seg_top10, seg_otros],
+     }
+     df_pastel = pd.DataFrame(datos)
+     df_pastel = df_pastel[df_pastel["porcentaje"] > 0].reset_index(drop=True)
+     return df_pastel
+
+def construir_df_rachas(df_user: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula la racha musical más larga para distintos umbrales
+    de minutos por día y regresa un dataframe.
+    """
+    umbrales = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120]
+    longitudes = []
+    for u in umbrales:
+        info = racha_musical_mas_larga(df_user, umbral_minutos_dia=u)
+        longitudes.append(info.get("longitud_racha", 0))
+    return pd.DataFrame(
+        {"umbral_minutos_dia": umbrales, "longitud_dias": longitudes}
+    )
 
 def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
     """
@@ -109,12 +190,126 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
 
     st.markdown("---")
 
+    st.markdown("## Top artistas y canciones")
+    # ---------- TOP ARTISTAS CON FOTO ----------
+    st.markdown("### Tus artistas más escuchados")
+
+    df_top_art = top_artistas(df_user, n=10)
+
+    df_img_all = cargar_imagenes_artistas()
+
+    if not df_img_all.empty:
+        df_img_all = df_img_all.copy()
+        df_img_all["usuario"] = df_img_all["usuario"].astype(str).str.strip().str.lower()
+        df_img_all["artista"] = df_img_all["artista"].astype(str).str.strip()
+    else:
+        df_img_all = pd.DataFrame(columns=["usuario", "artista", "url_imagen"])
+
+    usuario_key = str(usuario).strip().lower()
+    df_img_art = df_img_all[df_img_all["usuario"] == usuario_key]
+
+
+    if isinstance(df_top_art, pd.Series):
+        df_top_art = df_top_art.rename_axis("artista").reset_index(name="minutos_reproducidos")
+    elif isinstance(df_top_art, pd.DataFrame) and not df_top_art.empty:
+        cols_art = list(df_top_art.columns)
+        col_artista = next((c for c in cols_art if "artista" in c.lower()), cols_art[0])
+        col_min = next((c for c in cols_art if "minuto" in c.lower()), None)
+        if col_min is None and len(cols_art) > 1:
+            col_min = cols_art[1]
+        df_top_art = df_top_art.rename(
+            columns={col_artista: "artista", col_min: "minutos_reproducidos"}
+        )
+    else:
+        df_top_art = pd.DataFrame(columns=["artista", "minutos_reproducidos"])
+
+    if not df_top_art.empty:
+        df_top_art = df_top_art.copy()
+        df_top_art["artista"] = df_top_art["artista"].astype(str).str.strip()
+
+        df_merge = df_top_art.merge(
+            df_img_art[["artista", "url_imagen"]],
+            on="artista",
+            how="left",
+        )
+
+        # Grid de tarjetas (2 filas x 5 columnas máx)
+        for i in range(0, len(df_merge), 5):
+            fila = df_merge.iloc[i:i+5]
+            cols = st.columns(len(fila))
+            for col_st, (_, row) in zip(cols, fila.iterrows()):
+                with col_st:
+                    url = row.get("url_imagen")
+                    if isinstance(url, str) and url.strip() != "":
+                        # Si es URL web
+                        if url.startswith("http://") or url.startswith("https://"):
+                            st.image(url, width=160)
+                        else:
+                            ruta_img = RUTA_RAIZ / url
+                            if ruta_img.exists():
+                                img_proc = imagen_cuadrada(str(ruta_img), size=160)
+                                if img_proc is not None:
+                                    st.image(img_proc, width=160)
+                                else:
+                                    st.write("🖼️")
+                            else:
+                                st.write("🖼️")
+
+
+                    else:
+                        st.write("🖼️")
+                    st.markdown(f"**{row['artista']}**")
+                    st.markdown(f"{row['minutos_reproducidos']:.0f} min")
+    else:
+        st.info("No se pudo calcular el top de artistas.")
+
+
+    st.markdown("**Top canciones del año**")
+    df_top_songs = top_canciones(df_user, n=10)
+    if not df_top_songs.empty:
+        cols = list(df_top_songs)
+        if len(cols) >= 2:
+            posibles_y = [c for c in cols if "minutos" in c.lower()]
+            if posibles_y:
+                y_col = posibles_y[0]
+                x_posibles = [c for c in cols if c != y_col]
+                x_col = x_posibles[0] if x_posibles else cols[0]
+            else:
+                x_col, y_col = cols[0], cols[1]
+            
+            fig_top_songs = px.bar(
+                df_top_songs,
+                x=x_col,
+                y=y_col,
+                title = "Tus canciones más escuchadas",
+                labels={x_col: "Canción", y_col: "Minutos reproducidos"},
+                color_discrete_sequence=["#9467bd"],
+            )
+            fig_top_songs.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig_top_songs, use_container_width=True)
+        df_top_songs = top_canciones(df_user, n=10)
+
     st.markdown("### Índice de obsesión (Top 1 / Top 5 / Top 10)")
     obs = obsesion_multi(df_user)
     c1, c2, c3 = st.columns(3)
     c1.metric("Top 1", f"{obs['top_1']:.1f}%")
     c2.metric("Top 5", f"{obs['top_5']:.1f}%")
     c3.metric("Top 10", f"{obs['top_10']:.1f}%")
+    st.markdown("Como se concentra tu escucha")
+    df_pastel = preparar_pastel_obsesion(df_user)
+    if not df_pastel.empty:
+        fig_pastel = px.pie(
+            df_pastel,
+            names="segmento",
+            values="porcentaje",
+            hole=0.4,
+            title="Distribución de minutos entre tus artistas",
+        )
+        fig_pastel.update_traces(textposition="inside", textinfo="percent+label")
+        st.plotly_chart(fig_pastel, use_container_width=True)
+    else:
+        st.info("No hay información suficiente para el pastel de obsesión.")
+    
 
     st.markdown("---")
 
@@ -252,95 +447,83 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
             f"{long_racha} días",
         )
     
+    st.markdown("### Rachas según intensidad mínima")
+    df_rachas = construir_df_rachas(df_user)
+    if not df_rachas.empty:
+        fig_rachas = px.bar(
+            df_rachas,
+            x="umbral_minutos_dia",
+            y="longitud_dias",
+            labels={
+                "umbral_minutos_dia": "Umbral (min/día)",
+                "longitud_dias": "Duración de la racha (días)",
+            },
+            title="Tu racha más larga según el requisito mínimo de minutos/día",
+        )
+        st.plotly_chart(fig_rachas, use_container_width=True)
+    else:
+        st.info("No se pudieron calcular las rachas por umbral.")
+    
     st.markdown("---")
-    st.markdown("## Artistas y canciones")
-    col_a1, col_a2 = st.columns(2)
 
-    with col_a1:
-        st.markdown("**Top canciones del año**")
-        df_top_songs = top_canciones(df_user, n=10)
-        if not df_top_songs.empty:
-            cols = list(df_top_songs)
-            if len(cols) >= 2:
-                posibles_y = [c for c in cols if "minutos" in c.lower()]
+    st.markdown(" ## Artistas emergentes y artistas olvidados**")
+    res_artistas = artistas_emergentes_y_olvidados(df_user, top_n = 5)
+    df_emergentes = res_artistas.get("emergentes", pd.DataFrame())
+    df_olvidados = res_artistas.get("olvidados", pd.DataFrame())
+    tabs_art = st.tabs(["Emergentes", "Olvidados"])
+    with tabs_art[0]:
+        if not df_emergentes.empty:
+            st.markdown("Artistas que **ganaron peso** en la segunda mitad del año.")
+            st.dataframe(df_emergentes, use_container_width=True)
+            cols_em = list(df_emergentes.columns)
+            if len(cols_em) >= 2:
+                posibles_y = [c for c in cols_em if "minutos" in c.lower() or "delta" in c.lower()]
                 if posibles_y:
                     y_col = posibles_y[0]
-                    x_posibles = [c for c in cols if c != y_col]
-                    x_col = x_posibles[0] if x_posibles else cols[0]
+                    x_posibles = [c for c in cols_em if c != y_col]
+                    x_col = x_posibles[0] if x_posibles else cols_em[0]
                 else:
-                    x_col, y_col = cols[0], cols[1]
-                
-                fig_top_songs = px.bar(
-                    df_top_songs,
+                    x_col, y_col = cols_em[0], cols_em[1]
+                fig_em = px.bar(
+                    df_emergentes,
                     x=x_col,
                     y=y_col,
-                    title = "Tus canciones más escuchadas",
-                    labels={x_col: "Canción", y_col: "Minutos reproducidos"},
-                    color_discrete_sequence=["#9467bd"],
+                    title="Artistas emergentes",
+                    labels = {
+                        x_col: "Artista",
+                        y_col: "Cambio en minutos primera mitad vs segunda mitad"
+                    },
+                    color_discrete_sequence=["#2ca02c"],
                 )
-                fig_top_songs.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig_top_songs, use_container_width=True)
-            df_top_songs = top_canciones(df_user, n=10)
-    
-    with col_a2:
-        st.markdown("**Artistas emergentes y artistas olvidados**")
-        res_artistas = artistas_emergentes_y_olvidados(df_user, top_n = 5)
-        df_emergentes = res_artistas.get("emergentes", pd.DataFrame())
-        df_olvidados = res_artistas.get("olvidados", pd.DataFrame())
-        tabs_art = st.tabs(["Emergentes", "Olvidados"])
-        with tabs_art[0]:
-            if not df_emergentes.empty:
-                st.markdown("Artistas que **ganaron peso** en la segunda mitad del año.")
-                st.dataframe(df_emergentes, use_container_width=True)
-                cols_em = list(df_emergentes.columns)
-                if len(cols_em) >= 2:
-                    posibles_y = [c for c in cols_em if "minutos" in c.lower() or "delta" in c.lower()]
-                    if posibles_y:
-                        y_col = posibles_y[0]
-                        x_posibles = [c for c in cols_em if c != y_col]
-                        x_col = x_posibles[0] if x_posibles else cols_em[0]
-                    else:
-                        x_col, y_col = cols_em[0], cols_em[1]
-                    fig_em = px.bar(
-                        df_emergentes,
-                        x=x_col,
-                        y=y_col,
-                        title="Artistas emergentes",
-                        labels = {
-                            x_col: "Artista",
-                            y_col: "Cambio en minutos primera mitad vs segunda mitad"
-                        },
-                        color_discrete_sequence=["#2ca02c"],
-                    )
-                    fig_em.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig_em, use_container_width=True)
-            else:
-                st.info("No se detectaron artistas emergentes.")
-        with tabs_art[1]:
-            if not df_olvidados.empty:
-                st.markdown("Artistas que **perdieron peso** en la segunda mitad del año.")
-                st.dataframe(df_olvidados, use_container_width=True)
-                cols_ol = list(df_olvidados.columns)
-                if len(cols_ol) >= 2:
-                    posibles_y = [c for c in cols_ol if "minutos" in c.lower() or "delta" in c.lower()]
-                    if posibles_y:
-                        y_col = posibles_y[0]
-                        x_posibles = [c for c in cols_ol if c != y_col]
-                        x_col = x_posibles[0] if x_posibles else cols_ol[0]
-                    else:
-                        x_col, y_col = cols_ol[0], cols_ol[1]
-                    fig_ol = px.bar(
-                        df_olvidados,
-                        x=x_col,
-                        y=y_col,
-                        title="Artistas olvidados",
-                        labels={x_col: "Artista", y_col: "Camio en minutos primera mitad vs segunda mitad."},
-                        color_discrete_sequence=["#d62728"],
-                    )
-                    fig_ol.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig_ol, use_container_width=True)
-            else:
-                st.info("No se detectaron artistas olvidados.")
+                fig_em.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_em, use_container_width=True)
+        else:
+            st.info("No se detectaron artistas emergentes.")
+    with tabs_art[1]:
+        if not df_olvidados.empty:
+            st.markdown("Artistas que **perdieron peso** en la segunda mitad del año.")
+            st.dataframe(df_olvidados, use_container_width=True)
+            cols_ol = list(df_olvidados.columns)
+            if len(cols_ol) >= 2:
+                posibles_y = [c for c in cols_ol if "minutos" in c.lower() or "delta" in c.lower()]
+                if posibles_y:
+                    y_col = posibles_y[0]
+                    x_posibles = [c for c in cols_ol if c != y_col]
+                    x_col = x_posibles[0] if x_posibles else cols_ol[0]
+                else:
+                    x_col, y_col = cols_ol[0], cols_ol[1]
+                fig_ol = px.bar(
+                    df_olvidados,
+                    x=x_col,
+                    y=y_col,
+                    title="Artistas olvidados",
+                    labels={x_col: "Artista", y_col: "Camio en minutos primera mitad vs segunda mitad."},
+                    color_discrete_sequence=["#d62728"],
+                )
+                fig_ol.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_ol, use_container_width=True)
+        else:
+            st.info("No se detectaron artistas olvidados.")
 
 def render_tab_ambos(df_conjunto: pd.DataFrame):
     """
