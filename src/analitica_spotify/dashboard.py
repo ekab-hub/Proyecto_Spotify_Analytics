@@ -1,3 +1,4 @@
+#streamlit run src/analitica_spotify/dashboard.py
 import sys
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def cargar_imagenes_artistas() -> pd.DataFrame:
     except Exception:
         return pd.DataFrame(columns=["usuario", "artista", "url_imagen"])
 
-def imagen_cuadrada(path, size=160):
+def imagen_cuadrada(path, size=100):
     """
     Abre una imagen, la recorta al centro para que sea cuadrada
     y la redimensiona al tamaño especificado.
@@ -163,6 +164,323 @@ def construir_df_rachas(df_user: pd.DataFrame) -> pd.DataFrame:
         {"umbral_minutos_dia": umbrales, "longitud_dias": longitudes}
     )
 
+def inject_premium_css():
+    """Inyecta CSS premium para el dashboard estilo Spotify/Apple Music/Notion"""
+    st.markdown("""
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Variables de color premium - Paleta expandida */
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #121212;
+            --bg-card: #1a1a1a;
+            --bg-card-hover: #242424;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            /* Verde Spotify (principal) */
+            --accent-primary: #1db954;
+            --accent-secondary: #1ed760;
+            /* Colores adicionales para variedad */
+            --accent-blue: #509bf5;
+            --accent-purple: #af2896;
+            --accent-orange: #ff6b35;
+            --accent-pink: #ff1168;
+            --accent-cyan: #00d4ff;
+            --accent-yellow: #ffd700;
+            --border-color: #2a2a2a;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Fuentes personalizadas */
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6, .metric-value {
+            font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+        }
+        
+        .artist-name {
+            font-family: 'Poppins', 'Inter', sans-serif !important;
+        }
+        
+        /* Fondo principal */
+        .stApp {
+            background: linear-gradient(180deg, #0a0a0a 0%, #121212 100%);
+            color: var(--text-primary);
+        }
+        
+        /* Headers y títulos */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-primary) !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.03em;
+            font-family: 'Space Grotesk', sans-serif !important;
+        }
+        
+        h1 {
+            font-size: 2.5rem !important;
+            margin-bottom: 0.5rem !important;
+            font-weight: 800 !important;
+        }
+        
+        h2 {
+            font-size: 1.75rem !important;
+            margin-top: 2rem !important;
+            margin-bottom: 1rem !important;
+            font-weight: 700 !important;
+        }
+        
+        h3 {
+            font-size: 1.5rem !important;
+            margin-top: 1.5rem !important;
+            margin-bottom: 0.75rem !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Párrafos y texto */
+        p, .stMarkdown {
+            color: var(--text-secondary) !important;
+        }
+        
+        /* Cards premium */
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--accent-primary), var(--accent-blue));
+        }
+        
+        .metric-card:hover {
+            background: var(--bg-card-hover);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+            border-color: var(--accent-primary);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin: 8px 0;
+            letter-spacing: -0.03em;
+            font-family: 'Space Grotesk', sans-serif !important;
+        }
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        /* Contenedores de sección */
+        .section-container {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 32px;
+            margin: 24px 0;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Grid de artistas */
+        .artist-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            margin-bottom: 16px;
+        }
+        
+        .artist-card:hover {
+            background: var(--bg-card-hover);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+        }
+        
+        .artist-card img {
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-sm);
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            margin: 0 auto 12px auto;
+            display: block;
+        }
+        
+        .artist-name {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 12px 0 6px 0;
+            font-size: 1.15rem;
+            font-family: 'Poppins', sans-serif !important;
+            letter-spacing: -0.01em;
+        }
+        
+        .artist-minutes {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        /* Gráficas integradas */
+        .chart-container {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Tabs personalizados */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background: transparent;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background: var(--bg-card);
+            border-radius: 8px 8px 0 0;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 12px 24px;
+            font-weight: 500;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background: var(--bg-secondary);
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--accent-primary);
+            font-weight: 600;
+        }
+        
+        /* Separadores */
+        hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 32px 0;
+        }
+        
+        /* Métricas de Streamlit */
+        [data-testid="stMetricValue"] {
+            font-size: 2rem !important;
+            font-weight: 700 !important;
+            color: var(--text-primary) !important;
+        }
+        
+        [data-testid="stMetricLabel"] {
+            font-size: 0.875rem !important;
+            color: var(--text-secondary) !important;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        /* Info boxes */
+        .stInfo {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            color: var(--text-secondary) !important;
+        }
+        
+        /* Dataframes */
+        .stDataFrame {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        /* Espaciado mejorado */
+        .main .block-container {
+            padding-top: 3rem;
+            padding-bottom: 3rem;
+            max-width: 1400px;
+        }
+        
+        /* Mejorar espaciado entre secciones */
+        .element-container {
+            margin-bottom: 24px;
+        }
+        
+        /* Estilo para dataframes */
+        .stDataFrame {
+            background: var(--bg-card) !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            border: 1px solid var(--border-color) !important;
+        }
+        
+        /* Mejorar visualización de info boxes */
+        .stAlert {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            color: var(--text-secondary) !important;
+        }
+        
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+def render_metric_card(label: str, value: str, help_text: str = None):
+    """Renderiza una métrica en una card premium estilizada"""
+    help_html = f'<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px;">{help_text}</div>' if help_text else ''
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">{value}</div>
+        {help_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_section_container(content_html: str):
+    """Renderiza contenido dentro de un contenedor de sección premium"""
+    st.markdown(f'<div class="section-container">{content_html}</div>', unsafe_allow_html=True)
+
 def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
     """
     Renderiza la vista individual de un usuario (solo sus datos).
@@ -173,7 +491,7 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
         st.info(f"No hay datos para {etiqueta}.")
         return
 
-    st.subheader(f"Visión general — {etiqueta}")
+    st.markdown(f"<h2 style='margin-top: 0;'>Visión general — {etiqueta}</h2>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
@@ -182,17 +500,30 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
     artistas_unicos = df_user["artista"].nunique()
 
     with col1:
-        st.metric("Minutos totales", f"{minutos_totales:,.0f}")
+        render_metric_card("Minutos totales", f"{minutos_totales:,.0f}")
     with col2:
-        st.metric("Días con música", f"{dias_unicos:,}")
+        render_metric_card("Días con música", f"{dias_unicos:,}")
     with col3:
-        st.metric("Artistas distintos", f"{artistas_unicos:,}")
+        render_metric_card("Artistas distintos", f"{artistas_unicos:,}")
 
-    st.markdown("---")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
     st.markdown("## Top artistas y canciones")
     # ---------- TOP ARTISTAS CON FOTO ----------
     st.markdown("### Tus artistas más escuchados")
+    
+    st.markdown("""
+    <style>
+        .artist-grid-container {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 32px;
+            margin: 24px 0;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
     df_top_art = top_artistas(df_user, n=10)
 
@@ -233,38 +564,44 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
             how="left",
         )
 
-        # Grid de tarjetas (2 filas x 5 columnas máx)
+        # Grid de tarjetas (2 filas x 5 columnas máx) con estilo premium
         for i in range(0, len(df_merge), 5):
             fila = df_merge.iloc[i:i+5]
             cols = st.columns(len(fila))
             for col_st, (_, row) in zip(cols, fila.iterrows()):
                 with col_st:
                     url = row.get("url_imagen")
+                    artist_name = row['artista']
+                    minutes = row['minutos_reproducidos']
+                    
+                    # Contenedor de card
+                    st.markdown('<div class="artist-card" style="text-align: center;">', unsafe_allow_html=True)
+                    
+                    # Renderizar imagen (tamaño reducido)
                     if isinstance(url, str) and url.strip() != "":
-                        # Si es URL web
                         if url.startswith("http://") or url.startswith("https://"):
-                            st.image(url, width=160)
+                            st.image(url, width=100, use_container_width=False)
                         else:
                             ruta_img = RUTA_RAIZ / url
                             if ruta_img.exists():
-                                img_proc = imagen_cuadrada(str(ruta_img), size=160)
+                                img_proc = imagen_cuadrada(str(ruta_img), size=100)
                                 if img_proc is not None:
-                                    st.image(img_proc, width=160)
+                                    st.image(img_proc, width=100, use_container_width=False)
                                 else:
-                                    st.write("🖼️")
+                                    st.markdown('<div style="width: 100px; height: 100px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
                             else:
-                                st.write("🖼️")
-
-
+                                st.markdown('<div style="width: 100px; height: 100px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
                     else:
-                        st.write("🖼️")
-                    st.markdown(f"**{row['artista']}**")
-                    st.markdown(f"{row['minutos_reproducidos']:.0f} min")
+                        st.markdown('<div style="width: 100px; height: 100px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
+                    
+                    st.markdown(f'<div class="artist-name">{artist_name}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="artist-minutes">{minutes:.0f} min</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No se pudo calcular el top de artistas.")
 
 
-    st.markdown("**Top canciones del año**")
+    st.markdown("### Top canciones del año")
     df_top_songs = top_canciones(df_user, n=10)
     if not df_top_songs.empty:
         cols = list(df_top_songs)
@@ -283,19 +620,30 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                 y=y_col,
                 title = "Tus canciones más escuchadas",
                 labels={x_col: "Canción", y_col: "Minutos reproducidos"},
-                color_discrete_sequence=["#9467bd"],
+                color_discrete_sequence=["#1db954"],  # Verde principal
             )
-            fig_top_songs.update_layout(xaxis_tickangle=-45)
+            fig_top_songs.update_layout(
+                xaxis_tickangle=-45,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#b3b3b3',
+                title_font_color='#ffffff',
+            )
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.plotly_chart(fig_top_songs, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         df_top_songs = top_canciones(df_user, n=10)
 
     st.markdown("### Índice de obsesión (Top 1 / Top 5 / Top 10)")
     obs = obsesion_multi(df_user)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Top 1", f"{obs['top_1']:.1f}%")
-    c2.metric("Top 5", f"{obs['top_5']:.1f}%")
-    c3.metric("Top 10", f"{obs['top_10']:.1f}%")
-    st.markdown("Como se concentra tu escucha")
+    with c1:
+        render_metric_card("Top 1", f"{obs['top_1']:.1f}%")
+    with c2:
+        render_metric_card("Top 5", f"{obs['top_5']:.1f}%")
+    with c3:
+        render_metric_card("Top 10", f"{obs['top_10']:.1f}%")
+    st.markdown("<p style='color: var(--text-secondary); margin: 16px 0 24px 0;'>Como se concentra tu escucha</p>", unsafe_allow_html=True)
     df_pastel = preparar_pastel_obsesion(df_user)
     if not df_pastel.empty:
         fig_pastel = px.pie(
@@ -304,14 +652,23 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
             values="porcentaje",
             hole=0.4,
             title="Distribución de minutos entre tus artistas",
+            color_discrete_sequence=["#1db954", "#509bf5", "#af2896", "#ff6b35"],  # Verde + azul + púrpura + naranja
         )
-        fig_pastel.update_traces(textposition="inside", textinfo="percent+label")
+        fig_pastel.update_traces(textposition="inside", textinfo="percent+label", textfont_color='#ffffff')
+        fig_pastel.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_pastel, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No hay información suficiente para el pastel de obsesión.")
     
 
-    st.markdown("---")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
     st.markdown("### Ritmo del año: minutos por mes")
     df_min = minutos_por_anio_mes(df_user)
@@ -334,9 +691,19 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                 "minutos_reproducidos": "Minutos reproducidos",
             },
             title=f"Minutos reproducidos por mes — {etiqueta}",
-            color_discrete_sequence=["#FF4B4B"],
+            color_discrete_sequence=["#ff6b35"],  # Naranja para variedad
         )
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            xaxis_gridcolor='rgba(255,255,255,0.1)',
+            yaxis_gridcolor='rgba(255,255,255,0.1)',
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No hay datos suficientes para mostrar minutos por mes.")
 
@@ -368,10 +735,20 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                     "minutos_reproducidos": "Minutos reproducidos",
                 },
                 title="¿Qué días escuchas más?",
-                color_discrete_sequence=["#1f77b4"],
+                color_discrete_sequence=["#509bf5"],  # Azul para variedad
             )
-            fig_dia.update_layout(xaxis_tickangle=-30)
+            fig_dia.update_layout(
+                xaxis_tickangle=-30,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#b3b3b3',
+                title_font_color='#ffffff',
+                xaxis_gridcolor='rgba(255,255,255,0.1)',
+                yaxis_gridcolor='rgba(255,255,255,0.1)',
+            )
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.plotly_chart(fig_dia, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     with col_h2:
         st.markdown("**Minutos por bloque horario**")
@@ -396,9 +773,19 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                     "minutos_reproducidos": "Minutos reproducidos",
                 },
                 title="¿En qué momento del día escuchas más?",
-                color_discrete_sequence=["#ff7f0e"],
+                color_discrete_sequence=["#af2896"],  # Púrpura para variedad
             )
+            fig_bloques.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#b3b3b3',
+                title_font_color='#ffffff',
+                xaxis_gridcolor='rgba(255,255,255,0.1)',
+                yaxis_gridcolor='rgba(255,255,255,0.1)',
+            )
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.plotly_chart(fig_bloques, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("## Intensidad y consistencia")
 
@@ -426,23 +813,23 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
 
     with col_i1:
         if ratio is not None:
-            st.metric(
+            render_metric_card(
                 "¿Eres más de entre semana o de finde?",
                 f"{ratio:.2f}x",
-                help="Mayor que 1 significa que escuchas más entre semana que en fines de semana.",
+                "Mayor que 1 significa que escuchas más entre semana que en fines de semana."
             )
         else:
-            st.metric("¿Eres más de entre semana o de finde?", "N/A")
+            render_metric_card("¿Eres más de entre semana o de finde?", "N/A")
 
     with col_i2:
-        st.metric(
+        render_metric_card(
             "Promedio min/día",
             f"{var_diaria.get('promedio_minutos_por_dia', 0):.1f}",
         )
 
     with col_i3:
         long_racha = racha_30.get("longitud_racha", 0)
-        st.metric(
+        render_metric_card(
             "Racha más larga (≥30 min/día)",
             f"{long_racha} días",
         )
@@ -459,14 +846,25 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                 "longitud_dias": "Duración de la racha (días)",
             },
             title="Tu racha más larga según el requisito mínimo de minutos/día",
+            color_discrete_sequence=["#00d4ff"],  # Cyan para variedad
         )
+        fig_rachas.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            xaxis_gridcolor='rgba(255,255,255,0.1)',
+            yaxis_gridcolor='rgba(255,255,255,0.1)',
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig_rachas, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No se pudieron calcular las rachas por umbral.")
     
-    st.markdown("---")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
-    st.markdown(" ## Artistas emergentes y artistas olvidados**")
+    st.markdown("## Artistas emergentes y artistas olvidados")
     res_artistas = artistas_emergentes_y_olvidados(df_user, top_n = 5)
     df_emergentes = res_artistas.get("emergentes", pd.DataFrame())
     df_olvidados = res_artistas.get("olvidados", pd.DataFrame())
@@ -493,10 +891,20 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                         x_col: "Artista",
                         y_col: "Cambio en minutos primera mitad vs segunda mitad"
                     },
-                    color_discrete_sequence=["#2ca02c"],
+                    color_discrete_sequence=["#1db954"],  # Verde para emergentes (positivo)
                 )
-                fig_em.update_layout(xaxis_tickangle=-45)
+                fig_em.update_layout(
+                    xaxis_tickangle=-45,
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font_color='#b3b3b3',
+                    title_font_color='#ffffff',
+                    xaxis_gridcolor='rgba(255,255,255,0.1)',
+                    yaxis_gridcolor='rgba(255,255,255,0.1)',
+                )
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
                 st.plotly_chart(fig_em, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("No se detectaron artistas emergentes.")
     with tabs_art[1]:
@@ -517,11 +925,21 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
                     x=x_col,
                     y=y_col,
                     title="Artistas olvidados",
-                    labels={x_col: "Artista", y_col: "Camio en minutos primera mitad vs segunda mitad."},
-                    color_discrete_sequence=["#d62728"],
+                    labels={x_col: "Artista", y_col: "Cambio en minutos primera mitad vs segunda mitad"},
+                    color_discrete_sequence=["#e22134"],
                 )
-                fig_ol.update_layout(xaxis_tickangle=-45)
+                fig_ol.update_layout(
+                    xaxis_tickangle=-45,
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font_color='#b3b3b3',
+                    title_font_color='#ffffff',
+                    xaxis_gridcolor='rgba(255,255,255,0.1)',
+                    yaxis_gridcolor='rgba(255,255,255,0.1)',
+                )
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
                 st.plotly_chart(fig_ol, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("No se detectaron artistas olvidados.")
 
@@ -536,7 +954,7 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
         st.info("Se necesitan datos de Elias y de elie para mostrar la comparación.")
         return
 
-    st.subheader("Comparación general — Elias vs elie")
+    st.markdown("<h2 style='margin-top: 0;'>Comparación general — Elias vs elie</h2>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
@@ -544,13 +962,13 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
     minutos_elie = df_elie["minutos_reproducidos"].sum()
 
     with col1:
-        st.metric("Minutos totales — Elias", f"{minutos_elias:,.0f}")
+        render_metric_card("Minutos totales — Elias", f"{minutos_elias:,.0f}")
     with col2:
-        st.metric("Minutos totales — elie", f"{minutos_elie:,.0f}")
+        render_metric_card("Minutos totales — elie", f"{minutos_elie:,.0f}")
     with col3:
-        st.metric("Minutos totales — Ambos", f"{(minutos_elias + minutos_elie):,.0f}")
+        render_metric_card("Minutos totales — Ambos", f"{(minutos_elias + minutos_elie):,.0f}")
 
-    st.markdown("---")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
     st.markdown("### Comparación de obsesión (Top 1 / Top 5 / Top 10)")
 
@@ -560,20 +978,26 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown("**Elias**")
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>Elias</h4>", unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
-        c1.metric("Top 1", f"{obs_elias['top_1']:.1f}%")
-        c2.metric("Top 5", f"{obs_elias['top_5']:.1f}%")
-        c3.metric("Top 10", f"{obs_elias['top_10']:.1f}%")
+        with c1:
+            render_metric_card("Top 1", f"{obs_elias['top_1']:.1f}%")
+        with c2:
+            render_metric_card("Top 5", f"{obs_elias['top_5']:.1f}%")
+        with c3:
+            render_metric_card("Top 10", f"{obs_elias['top_10']:.1f}%")
 
     with col_b:
-        st.markdown("**elie**")
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>elie</h4>", unsafe_allow_html=True)
         c4, c5, c6 = st.columns(3)
-        c4.metric("Top 1", f"{obs_elie['top_1']:.1f}%")
-        c5.metric("Top 5", f"{obs_elie['top_5']:.1f}%")
-        c6.metric("Top 10", f"{obs_elie['top_10']:.1f}%")
+        with c4:
+            render_metric_card("Top 1", f"{obs_elie['top_1']:.1f}%")
+        with c5:
+            render_metric_card("Top 5", f"{obs_elie['top_5']:.1f}%")
+        with c6:
+            render_metric_card("Top 10", f"{obs_elie['top_10']:.1f}%")
 
-    st.markdown("---")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
     st.markdown("### Minutos por mes — comparativo")
 
@@ -602,8 +1026,20 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
                 "usuario": "Usuario",
             },
             title="Minutos reproducidos por mes — Elias vs elie",
+            color_discrete_sequence=["#1db954", "#509bf5"],  # Verde + azul para comparación
         )
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            xaxis_gridcolor='rgba(255,255,255,0.1)',
+            yaxis_gridcolor='rgba(255,255,255,0.1)',
+            legend_bgcolor='rgba(0,0,0,0)',
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No hay datos suficientes para mostrar minutos por mes.")
 
@@ -613,12 +1049,28 @@ def main():
         page_title="Spotify Analytics - Elias & Elie",
         layout="wide",
     )
+    
+    # Inyectar CSS premium
+    inject_premium_css()
 
-    st.title("🎧 Spotify Analytics — Elias & Elie")
-    st.markdown(
-        "Dashboard interactivo para explorar y comparar los hábitos musicales de "
-        "**Elias** y **elie** a partir de sus historiales personales de Spotify."
-    )
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0; margin-bottom: 2rem;">
+        <h1 style="background: linear-gradient(135deg, #1db954 0%, #509bf5 50%, #af2896 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    font-size: 3rem;
+                    font-weight: 800;
+                    letter-spacing: -0.03em;
+                    margin-bottom: 0.5rem;
+                    font-family: 'Space Grotesk', sans-serif;">🎧 Spotify Analytics</h1>
+        <p style="color: var(--text-secondary); font-size: 1.1rem; margin-top: 0.5rem; font-weight: 400;">
+            Dashboard interactivo para explorar y comparar los hábitos musicales de 
+            <strong style="color: var(--text-primary); font-weight: 600;">Elias</strong> y 
+            <strong style="color: var(--text-primary); font-weight: 600;">elie</strong> a partir de sus historiales personales de Spotify.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     df_elias, df_elie = cargar_datos()
     if df_elias.empty and df_elie.empty:
