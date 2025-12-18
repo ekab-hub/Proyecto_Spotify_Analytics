@@ -23,7 +23,9 @@ from src.analitica_spotify.consultas import (
     resumen_variabilidad_diaria,
     racha_musical_mas_larga,
     top_canciones,
-    artistas_emergentes_y_olvidados
+    artistas_emergentes_y_olvidados,
+    velocidad_aburrimiento,
+    fidelidad_vs_exploracion
 )
 
 def cargar_imagenes_artistas() -> pd.DataFrame:
@@ -102,8 +104,8 @@ def cargar_datos():
 
 def preparar_df_conjunto(df_elias: pd.DataFrame, df_elie: pd.DataFrame) -> pd.DataFrame:
     """
-    Une los dataframes de Elias y elie en uno solo,
-    con columna 'usuario' = 'Elias' o 'elie'.
+    Une los dataframes de Elias y Elie en uno solo,
+    con columna 'usuario' = 'Elias' o 'Elie'.
     """
     frames = []
 
@@ -114,7 +116,7 @@ def preparar_df_conjunto(df_elias: pd.DataFrame, df_elie: pd.DataFrame) -> pd.Da
 
     if not df_elie.empty:
         temp = df_elie.copy()
-        temp["usuario"] = "elie"
+        temp["usuario"] = "Elie"
         frames.append(temp)
 
     if not frames:
@@ -945,16 +947,16 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
 
 def render_tab_ambos(df_conjunto: pd.DataFrame):
     """
-    Renderiza la pestaña comparativa Elias vs elie.
+    Renderiza la pestaña comparativa Elias vs Elie.
     """
     df_elias = df_conjunto[df_conjunto["usuario"] == "Elias"].copy()
-    df_elie = df_conjunto[df_conjunto["usuario"] == "elie"].copy()
+    df_elie = df_conjunto[df_conjunto["usuario"] == "Elie"].copy()
 
     if df_elias.empty or df_elie.empty:
-        st.info("Se necesitan datos de Elias y de elie para mostrar la comparación.")
+        st.info("Se necesitan datos de Elias y de Elie para mostrar la comparación.")
         return
 
-    st.markdown("<h2 style='margin-top: 0;'>Comparación general — Elias vs elie</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0;'>Comparación general — Elias vs Elie</h2>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
@@ -964,9 +966,74 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
     with col1:
         render_metric_card("Minutos totales — Elias", f"{minutos_elias:,.0f}")
     with col2:
-        render_metric_card("Minutos totales — elie", f"{minutos_elie:,.0f}")
+        render_metric_card("Minutos totales — Elie", f"{minutos_elie:,.0f}")
     with col3:
         render_metric_card("Minutos totales — Ambos", f"{(minutos_elias + minutos_elie):,.0f}")
+
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
+    # ---------- ARTISTAS COMPARTIDOS ----------
+    st.markdown("<h3 style='text-align: center;'>Artistas que ambos escuchamos</h3>", unsafe_allow_html=True)
+    
+    # Obtener top artistas de ambos (usamos un N mayor para encontrar intersección)
+    top_elias_ser = top_artistas(df_elias, n=50)
+    top_elie_ser = top_artistas(df_elie, n=50)
+    
+    artistas_elias = set(top_elias_ser.index)
+    artistas_elie = set(top_elie_ser.index)
+    
+    compartidos = list(artistas_elias.intersection(artistas_elie))
+    
+    if compartidos:
+        # Ordenar por minutos totales combinados en ambos datasets
+        minutos_compartidos = (
+            df_conjunto[df_conjunto["artista"].isin(compartidos)]
+            .groupby("artista")["minutos_reproducidos"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        compartidos = minutos_compartidos.index.tolist()[:3]
+
+    if len(compartidos) >= 2:
+        df_img_all = cargar_imagenes_artistas()
+        
+        # Columnas para centrar
+        if len(compartidos) == 2:
+            cols_shared = st.columns([1, 2, 2, 1])
+            idx_cols = [1, 2]
+        else: # 3
+            cols_shared = st.columns([1, 2, 2, 2, 1])
+            idx_cols = [1, 2, 3]
+            
+        for i, artista in enumerate(compartidos):
+            with cols_shared[idx_cols[i]]:
+                # Buscar imagen
+                img_row = df_img_all[df_img_all["artista"] == artista].head(1)
+                url = img_row["url_imagen"].iloc[0] if not img_row.empty else None
+                
+                st.markdown('<div class="artist-card" style="text-align: center;">', unsafe_allow_html=True)
+                
+                if isinstance(url, str) and url.strip() != "":
+                    if url.startswith("http://") or url.startswith("https://"):
+                        st.image(url, width=120, use_container_width=False)
+                    else:
+                        ruta_img = RUTA_RAIZ / url
+                        if ruta_img.exists():
+                            img_proc = imagen_cuadrada(str(ruta_img), size=120)
+                            if img_proc is not None:
+                                st.image(img_proc, width=120, use_container_width=False)
+                            else:
+                                st.markdown('<div style="width: 120px; height: 120px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div style="width: 120px; height: 120px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div style="width: 120px; height: 120px; background: #2a2a2a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">🖼️</div>', unsafe_allow_html=True)
+                
+                st.markdown(f'<div class="artist-name">{artista}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="artist-minutes">Gusto compartido</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("No hay suficientes artistas en común para mostrar esta sección.")
 
     st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
 
@@ -988,7 +1055,7 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
             render_metric_card("Top 10", f"{obs_elias['top_10']:.1f}%")
 
     with col_b:
-        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>elie</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>Elie</h4>", unsafe_allow_html=True)
         c4, c5, c6 = st.columns(3)
         with c4:
             render_metric_card("Top 1", f"{obs_elie['top_1']:.1f}%")
@@ -1002,7 +1069,7 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
     st.markdown("### Minutos por mes — comparativo")
 
     df_min_elias = minutos_por_anio_mes(df_elias).assign(usuario="Elias")
-    df_min_elie = minutos_por_anio_mes(df_elie).assign(usuario="elie")
+    df_min_elie = minutos_por_anio_mes(df_elie).assign(usuario="Elie")
 
     df_min = pd.concat([df_min_elias, df_min_elie], ignore_index=True)
 
@@ -1025,7 +1092,7 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
                 "minutos_reproducidos": "Minutos reproducidos",
                 "usuario": "Usuario",
             },
-            title="Minutos reproducidos por mes — Elias vs elie",
+            title="Minutos reproducidos por mes — Elias vs Elie",
             color_discrete_sequence=["#1db954", "#509bf5"],  # Verde + azul para comparación
         )
         fig.update_layout(
@@ -1042,6 +1109,191 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No hay datos suficientes para mostrar minutos por mes.")
+
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
+    # ---------- COMPARATIVA DE HÁBITOS HORARIOS ----------
+    st.markdown("### ¿Quién es más de mañana o de noche?")
+    
+    df_bloques_elias = minutos_por_bloque_horario(df_elias).assign(usuario="Elias")
+    df_bloques_elie = minutos_por_bloque_horario(df_elie).assign(usuario="Elie")
+    df_bloques_comp = pd.concat([df_bloques_elias, df_bloques_elie], ignore_index=True)
+
+    if not df_bloques_comp.empty:
+        fig_habitos = px.bar(
+            df_bloques_comp,
+            x="bloque_horario",
+            y="minutos_reproducidos",
+            color="usuario",
+            barmode="group",
+            title="Distribución de escucha por bloques horarios",
+            labels={
+                "bloque_horario": "Bloque del día",
+                "minutos_reproducidos": "Minutos totales",
+                "usuario": "Usuario"
+            },
+            color_discrete_sequence=["#1db954", "#509bf5"],
+        )
+        fig_habitos.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            xaxis_gridcolor='rgba(255,255,255,0.1)',
+            yaxis_gridcolor='rgba(255,255,255,0.1)',
+        )
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(fig_habitos, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Resumen comparativo en cards
+        c1, c2 = st.columns(2)
+        
+        # Encontrar quién lidera en mañana y noche
+        manana_data = df_bloques_comp[df_bloques_comp["bloque_horario"] == "manana"]
+        noche_data = df_bloques_comp[df_bloques_comp["bloque_horario"] == "noche"]
+        
+        if not manana_data.empty:
+            lider_manana = manana_data.loc[manana_data["minutos_reproducidos"].idxmax(), "usuario"]
+            with c1:
+                render_metric_card("Rey de la Manana", lider_manana, "Usuario con más minutos entre las 6:00 y las 12:00")
+        
+        if not noche_data.empty:
+            lider_noche = noche_data.loc[noche_data["minutos_reproducidos"].idxmax(), "usuario"]
+            with c2:
+                render_metric_card("Rey de la noche", lider_noche, "Usuario con más minutos entre las 18:00 y las 00:00")
+    else:
+        st.info("No hay datos suficientes para comparar hábitos horarios.")
+
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
+    # ---------- VELOCIDAD DE ABURRIMIENTO ----------
+    st.markdown("### Velocidad de aburrimiento")
+    st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Promedio de días consecutivos que escuchan una canción antes de dejarla. Un valor más bajo indica que se aburre más rápido de las canciones.</p>", unsafe_allow_html=True)
+    
+    vel_elias = velocidad_aburrimiento(df_elias)
+    vel_elie = velocidad_aburrimiento(df_elie)
+    
+    col_vel1, col_vel2 = st.columns(2)
+    
+    with col_vel1:
+        render_metric_card("Promedio de racha — Elias", f"{vel_elias:.2f} días", "Días consecutivos promedio antes de dejar una canción")
+    
+    with col_vel2:
+        render_metric_card("Promedio de racha — Elie", f"{vel_elie:.2f} días", "Días consecutivos promedio antes de dejar una canción")
+    
+    # Determinar quién se aburre más rápido
+    if vel_elias > 0 and vel_elie > 0:
+        if vel_elias < vel_elie:
+            mensaje_aburrimiento = "Elias se aburre más rápido de las canciones"
+            color_ganador = "#1db954"
+        elif vel_elie < vel_elias:
+            mensaje_aburrimiento = "Elie se aburre más rápido de las canciones"
+            color_ganador = "#509bf5"
+        else:
+            mensaje_aburrimiento = "Ambos tienen la misma velocidad de aburrimiento"
+            color_ganador = "#b3b3b3"
+        
+        st.markdown(f"""
+        <div style="background: var(--bg-card); border-radius: 16px; padding: 24px; margin: 16px 0; border: 1px solid var(--border-color); text-align: center;">
+            <div style="font-size: 1.25rem; font-weight: 600; color: {color_ganador};">
+                {mensaje_aburrimiento}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
+    # ---------- FIDELIDAD VS EXPLORACIÓN ----------
+    st.markdown("### ¿Explorador o Fiel?")
+    st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Porcentaje de canciones nuevas vs ya escuchadas antes. Explorador = siempre buscando música nueva. Fiel = regresa a lo que le gusta.</p>", unsafe_allow_html=True)
+    
+    df_fidelidad_elias = fidelidad_vs_exploracion(df_elias)
+    df_fidelidad_elie = fidelidad_vs_exploracion(df_elie)
+    
+    # Ordenar para consistencia de colores: "Nuevas" primero (verde), luego "Ya escuchadas" (púrpura)
+    if not df_fidelidad_elias.empty:
+        df_fidelidad_elias["orden"] = df_fidelidad_elias["tipo"].map({"Nuevas": 0, "Ya escuchadas": 1})
+        df_fidelidad_elias = df_fidelidad_elias.sort_values("orden").drop("orden", axis=1)
+    if not df_fidelidad_elie.empty:
+        df_fidelidad_elie["orden"] = df_fidelidad_elie["tipo"].map({"Nuevas": 0, "Ya escuchadas": 1})
+        df_fidelidad_elie = df_fidelidad_elie.sort_values("orden").drop("orden", axis=1)
+    
+    col_fid1, col_fid2 = st.columns(2)
+    
+    with col_fid1:
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px; text-align: center;'>Elias</h4>", unsafe_allow_html=True)
+        if not df_fidelidad_elias.empty:
+            fig_elias = px.pie(
+                df_fidelidad_elias,
+                values="porcentaje",
+                names="tipo",
+                hole=0.4,
+                title="Elias",
+                color_discrete_sequence=["#1db954", "#af2896"],  # Verde para nuevas, púrpura para fieles
+            )
+            fig_elias.update_traces(
+                textposition="inside",
+                textinfo="percent+label",
+                textfont_color='#ffffff',
+                textfont_size=14
+            )
+            fig_elias.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#b3b3b3',
+                title_font_color='#ffffff',
+                showlegend=True,
+                legend=dict(
+                    orientation="v",
+                    yanchor="middle",
+                    y=0.5,
+                    xanchor="left",
+                    x=1.05
+                )
+            )
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.plotly_chart(fig_elias, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("No hay datos suficientes para mostrar fidelidad vs exploración.")
+    
+    with col_fid2:
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px; text-align: center;'>Elie</h4>", unsafe_allow_html=True)
+        if not df_fidelidad_elie.empty:
+            fig_elie = px.pie(
+                df_fidelidad_elie,
+                values="porcentaje",
+                names="tipo",
+                hole=0.4,
+                title="Elie",
+                color_discrete_sequence=["#1db954", "#af2896"],  # Verde para nuevas, púrpura para fieles
+            )
+            fig_elie.update_traces(
+                textposition="inside",
+                textinfo="percent+label",
+                textfont_color='#ffffff',
+                textfont_size=14
+            )
+            fig_elie.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#b3b3b3',
+                title_font_color='#ffffff',
+                showlegend=True,
+                legend=dict(
+                    orientation="v",
+                    yanchor="middle",
+                    y=0.5,
+                    xanchor="left",
+                    x=1.05
+                )
+            )
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.plotly_chart(fig_elie, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("No hay datos suficientes para mostrar fidelidad vs exploración.")
 
 
 def main():
@@ -1067,7 +1319,7 @@ def main():
         <p style="color: var(--text-secondary); font-size: 1.1rem; margin-top: 0.5rem; font-weight: 400;">
             Dashboard interactivo para explorar y comparar los hábitos musicales de 
             <strong style="color: var(--text-primary); font-weight: 600;">Elias</strong> y 
-            <strong style="color: var(--text-primary); font-weight: 600;">elie</strong> a partir de sus historiales personales de Spotify.
+            <strong style="color: var(--text-primary); font-weight: 600;">Elie</strong> a partir de sus historiales personales de Spotify.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1081,13 +1333,13 @@ def main():
         st.info("No se pudo construir el dataframe conjunto.")
         st.stop()
 
-    tab_elias, tab_elie, tab_ambos = st.tabs(["Elias", "elie", "Ambos"])
+    tab_elias, tab_elie, tab_ambos = st.tabs(["Elias", "Elie", "Ambos"])
 
     with tab_elias:
         render_tab_usuario(df_conjunto, usuario="Elias", etiqueta="Elias")
 
     with tab_elie:
-        render_tab_usuario(df_conjunto, usuario="elie", etiqueta="elie")
+        render_tab_usuario(df_conjunto, usuario="Elie", etiqueta="Elie")
 
     with tab_ambos:
         render_tab_ambos(df_conjunto)

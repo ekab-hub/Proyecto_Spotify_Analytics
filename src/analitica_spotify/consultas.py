@@ -323,3 +323,98 @@ def artistas_emergentes_y_olvidados(df: pd.DataFrame, top_n: int = 10) -> dict:
     )
 
     return {"emergentes": emergentes, "olvidados": olvidados}
+
+def velocidad_aburrimiento(df: pd.DataFrame, min_reproducciones: int = 2) -> float:
+    """
+    Calcula la velocidad de aburrimiento promedio: promedio de la racha máxima
+    (días consecutivos) que tuvo cada canción antes de dejar de escucharla.
+    
+    Una canción debe haber sido escuchada al menos en min_reproducciones días
+    diferentes para ser considerada.
+    
+    Retorna el promedio de rachas máximas. Un valor más bajo indica
+    que se "aburre más rápido" de las canciones.
+    """
+    df = df.copy()
+    df["fecha"] = df["fecha_reproduccion"].dt.date
+    
+    # Para cada canción, obtener las fechas únicas en que se escuchó
+    fechas_por_cancion = (
+        df.groupby(["cancion", "artista"])["fecha"]
+          .apply(lambda x: sorted(set(x)))
+          .reset_index()
+    )
+    
+    rachas_maximas = []
+    
+    for _, row in fechas_por_cancion.iterrows():
+        fechas = row["fecha"]
+        
+        # Solo considerar canciones escuchadas en múltiples días
+        if len(fechas) < min_reproducciones:
+            continue
+        
+        # Convertir a datetime para calcular diferencias
+        fechas_dt = pd.to_datetime(fechas)
+        
+        # Calcular la racha máxima consecutiva
+        max_racha = 1
+        racha_actual = 1
+        
+        for i in range(1, len(fechas_dt)):
+            diff_dias = (fechas_dt[i] - fechas_dt[i-1]).days
+            if diff_dias == 1:  # Día consecutivo
+                racha_actual += 1
+            else:
+                max_racha = max(max_racha, racha_actual)
+                racha_actual = 1
+        
+        max_racha = max(max_racha, racha_actual)
+        rachas_maximas.append(max_racha)
+    
+    if not rachas_maximas:
+        return 0.0
+    
+    return round(sum(rachas_maximas) / len(rachas_maximas), 2)
+
+def fidelidad_vs_exploracion(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula el porcentaje de canciones nuevas vs ya escuchadas antes.
+    
+    Para cada reproducción, determina si es la primera vez que se escucha
+    esa canción (nueva) o ya se había escuchado antes (fiel).
+    
+    Retorna un DataFrame con columnas: 'tipo', 'porcentaje'
+    donde tipo puede ser 'Nuevas' o 'Ya escuchadas'
+    """
+    df = df.copy()
+    df = df.sort_values("fecha_reproduccion").reset_index(drop=True)
+    
+    # Crear identificador único de canción
+    df["cancion_completa"] = df["artista"] + " - " + df["cancion"]
+    
+    canciones_vistas = set()
+    nuevas = 0
+    repetidas = 0
+    
+    for cancion_completa in df["cancion_completa"]:
+        if cancion_completa not in canciones_vistas:
+            nuevas += 1
+            canciones_vistas.add(cancion_completa)
+        else:
+            repetidas += 1
+    
+    total = nuevas + repetidas
+    if total == 0:
+        return pd.DataFrame({"tipo": ["Nuevas", "Ya escuchadas"], "porcentaje": [0, 0]})
+    
+    pct_nuevas = round((nuevas / total) * 100, 2)
+    pct_repetidas = round((repetidas / total) * 100, 2)
+    
+    resultado = pd.DataFrame({
+        "tipo": ["Nuevas", "Ya escuchadas"],
+        "porcentaje": [pct_nuevas, pct_repetidas],
+        "count": [nuevas, repetidas]
+    })
+    
+    return resultado
