@@ -447,6 +447,40 @@ def inject_premium_css():
             color: var(--text-secondary) !important;
         }
         
+        /* Estilizar tablas de dataframes */
+        .stDataFrame table {
+            background: var(--bg-card) !important;
+            border-radius: 12px !important;
+            overflow: hidden;
+        }
+        
+        .stDataFrame thead tr th {
+            background: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+            font-weight: 600 !important;
+            border-bottom: 2px solid var(--accent-primary) !important;
+            padding: 12px !important;
+        }
+        
+        .stDataFrame tbody tr {
+            background: var(--bg-card) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+        
+        .stDataFrame tbody tr:hover {
+            background: var(--bg-card-hover) !important;
+        }
+        
+        .stDataFrame tbody tr td {
+            color: var(--text-secondary) !important;
+            padding: 10px 12px !important;
+        }
+        
+        .stDataFrame tbody tr td:first-child {
+            color: var(--text-primary) !important;
+            font-weight: 600 !important;
+        }
+        
         /* Scrollbar personalizado */
         ::-webkit-scrollbar {
             width: 8px;
@@ -873,8 +907,10 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
     tabs_art = st.tabs(["Emergentes", "Olvidados"])
     with tabs_art[0]:
         if not df_emergentes.empty:
-            st.markdown("Artistas que **ganaron peso** en la segunda mitad del año.")
+            st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Artistas que <strong style='color: var(--accent-primary);'>ganaron peso</strong> en la segunda mitad del año.</p>", unsafe_allow_html=True)
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.dataframe(df_emergentes, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             cols_em = list(df_emergentes.columns)
             if len(cols_em) >= 2:
                 posibles_y = [c for c in cols_em if "minutos" in c.lower() or "delta" in c.lower()]
@@ -911,8 +947,10 @@ def render_tab_usuario(df_conjunto: pd.DataFrame, usuario: str, etiqueta: str):
             st.info("No se detectaron artistas emergentes.")
     with tabs_art[1]:
         if not df_olvidados.empty:
-            st.markdown("Artistas que **perdieron peso** en la segunda mitad del año.")
+            st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Artistas que <strong style='color: var(--accent-pink);'>perdieron peso</strong> en la segunda mitad del año.</p>", unsafe_allow_html=True)
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.dataframe(df_olvidados, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             cols_ol = list(df_olvidados.columns)
             if len(cols_ol) >= 2:
                 posibles_y = [c for c in cols_ol if "minutos" in c.lower() or "delta" in c.lower()]
@@ -1036,16 +1074,78 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
         st.info("No hay suficientes artistas en común para mostrar esta sección.")
 
     st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+    
+    # ---------- COMPARATIVA DE MINUTOS POR ARTISTA COMPARTIDO ----------
+    if len(compartidos) >= 2:
+        st.markdown("### Comparativa de minutos por artista compartido")
+        st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Minutos que cada uno escuchó de los artistas que ambos comparten.</p>", unsafe_allow_html=True)
+        
+        # Crear dataframe comparativo
+        datos_comparativa = []
+        for artista in compartidos:
+            minutos_elias_art = df_elias[df_elias["artista"] == artista]["minutos_reproducidos"].sum()
+            minutos_elie_art = df_elie[df_elie["artista"] == artista]["minutos_reproducidos"].sum()
+            datos_comparativa.append({
+                "artista": artista,
+                "Elias": minutos_elias_art,
+                "Elie": minutos_elie_art
+            })
+        
+        df_comparativa = pd.DataFrame(datos_comparativa)
+        
+        # Transformar a formato largo para la gráfica
+        df_comparativa_melt = df_comparativa.melt(
+            id_vars=["artista"],
+            value_vars=["Elias", "Elie"],
+            var_name="usuario",
+            value_name="minutos_reproducidos"
+        )
+        
+        # Crear gráfica de barras agrupadas
+        fig_comparativa = px.bar(
+            df_comparativa_melt,
+            x="artista",
+            y="minutos_reproducidos",
+            color="usuario",
+            barmode="group",
+            title="Minutos escuchados por artista compartido",
+            labels={
+                "artista": "Artista",
+                "minutos_reproducidos": "Minutos reproducidos",
+                "usuario": "Usuario"
+            },
+            color_discrete_sequence=["#1db954", "#509bf5"],
+        )
+        
+        fig_comparativa.update_layout(
+            xaxis_tickangle=-30,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            xaxis_gridcolor='rgba(255,255,255,0.1)',
+            yaxis_gridcolor='rgba(255,255,255,0.1)',
+            legend_bgcolor='rgba(0,0,0,0)',
+        )
+        
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(fig_comparativa, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("### Comparación de obsesión (Top 1 / Top 5 / Top 10)")
+    st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
+    st.markdown("### Comparación de obsesión musical")
 
     obs_elias = obsesion_multi(df_elias)
     obs_elie = obsesion_multi(df_elie)
-
-    col_a, col_b = st.columns(2)
-
-    with col_a:
-        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>Elias</h4>", unsafe_allow_html=True)
+    
+    # Tarjetas de métricas de obsesión (Top 1, Top 5, Top 10)
+    st.markdown("<p style='color: var(--text-secondary); margin-bottom: 16px;'>Índice de obsesión por categoría</p>", unsafe_allow_html=True)
+    
+    col_obs1, col_obs2 = st.columns(2)
+    
+    with col_obs1:
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px; text-align: center;'>Elias</h4>", unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         with c1:
             render_metric_card("Top 1", f"{obs_elias['top_1']:.1f}%")
@@ -1053,9 +1153,9 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
             render_metric_card("Top 5", f"{obs_elias['top_5']:.1f}%")
         with c3:
             render_metric_card("Top 10", f"{obs_elias['top_10']:.1f}%")
-
-    with col_b:
-        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px;'>Elie</h4>", unsafe_allow_html=True)
+    
+    with col_obs2:
+        st.markdown("<h4 style='color: var(--text-primary); margin-bottom: 16px; text-align: center;'>Elie</h4>", unsafe_allow_html=True)
         c4, c5, c6 = st.columns(3)
         with c4:
             render_metric_card("Top 1", f"{obs_elie['top_1']:.1f}%")
@@ -1063,8 +1163,66 @@ def render_tab_ambos(df_conjunto: pd.DataFrame):
             render_metric_card("Top 5", f"{obs_elie['top_5']:.1f}%")
         with c6:
             render_metric_card("Top 10", f"{obs_elie['top_10']:.1f}%")
+    
+    st.markdown("<p style='color: var(--text-secondary); margin: 24px 0 16px 0; text-align: center;'>Distribución de minutos entre artistas</p>", unsafe_allow_html=True)
+
+    def donut_obsesion(obs_dict, usuario):
+        # Usar la misma lógica que preparar_pastel_obsesion
+        seg_top1 = obs_dict["top_1"]
+        seg_top5 = max(obs_dict["top_5"] - obs_dict["top_1"], 0)
+        seg_top10 = max(obs_dict["top_10"] - obs_dict["top_5"], 0)
+        seg_otros = max(100 - obs_dict["top_10"], 0)
+        
+        df = pd.DataFrame({
+            "segmento": ["Top 1", "Resto Top 5", "Resto Top 10", "Otros"],
+            "porcentaje": [seg_top1, seg_top5, seg_top10, seg_otros],
+        })
+        
+        # Filtrar segmentos con valor 0
+        df = df[df["porcentaje"] > 0].reset_index(drop=True)
+
+        fig = px.pie(
+            df,
+            names="segmento",
+            values="porcentaje",
+            hole=0.4,
+            title=usuario,
+            color_discrete_sequence=["#1db954", "#509bf5", "#af2896", "#ff6b35"],
+        )
+
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='#b3b3b3',
+            title_font_color='#ffffff',
+            showlegend=True,
+            margin=dict(t=60, b=0, l=0, r=0),
+        )
+
+        fig.update_traces(
+            textposition="inside",
+            textinfo="percent+label",
+            textfont_color='#ffffff',
+        )
+
+        return fig
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        fig_elias = donut_obsesion(obs_elias, "Elias")
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(fig_elias, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_b:
+        fig_elie = donut_obsesion(obs_elie, "Elie")
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(fig_elie, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='margin: 32px 0;'></div>", unsafe_allow_html=True)
+
 
     st.markdown("### Minutos por mes — comparativo")
 
