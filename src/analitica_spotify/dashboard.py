@@ -77,29 +77,31 @@ def imagen_cuadrada(path, size=100):
 
 def cargar_datos():
     """
-    Carga elias_limpio.csv y elie_limpio.csv desde datos/procesados.
+    Prioridad de lectura:
+    1) /data (volumen montado por Docker)
+    2) datos/procesados (datos demo del repo)
     """
-    ruta_datos = RUTA_RAIZ / "datos" / "procesados"
+    ruta_externa = Path("/data")
+    ruta_local = RUTA_RAIZ / "datos" / "procesados"
 
-    try:
-        df_elias = pd.read_csv(
-            ruta_datos / "elias_limpio.csv",
-            parse_dates=["fecha_reproduccion"],
-        )
-    except FileNotFoundError:
-        st.error("No se encontró el archivo elias_limpio.csv en datos/procesados.")
-        df_elias = pd.DataFrame()
+    def leer_csv(ruta, nombre):
+        try:
+            return pd.read_csv(
+                ruta / nombre,
+                parse_dates=["fecha_reproduccion"],
+            )
+        except FileNotFoundError:
+            return pd.DataFrame()
 
-    try:
-        df_elie = pd.read_csv(
-            ruta_datos / "elie_limpio.csv",
-            parse_dates=["fecha_reproduccion"],
-        )
-    except FileNotFoundError:
-        st.error("No se encontró el archivo elie_limpio.csv en datos/procesados.")
-        df_elie = pd.DataFrame()
+    df_elias = leer_csv(ruta_externa, "elias_limpio.csv")
+    df_elie  = leer_csv(ruta_externa, "elie_limpio.csv")
+
+    if df_elias.empty and df_elie.empty:
+        df_elias = leer_csv(ruta_local, "elias_limpio.csv")
+        df_elie  = leer_csv(ruta_local, "elie_limpio.csv")
 
     return df_elias, df_elie
+
 
 
 def preparar_df_conjunto(df_elias: pd.DataFrame, df_elie: pd.DataFrame) -> pd.DataFrame:
